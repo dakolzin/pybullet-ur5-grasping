@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+
+logs/
+logs_v2/
+logs_v3/
+logs_v4/
+logs_v5/
+
+paper_*/
+
+compare*.csv
+result.txt
+
