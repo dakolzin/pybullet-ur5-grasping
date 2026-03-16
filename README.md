@@ -1,168 +1,227 @@
-# PyBullet UR5 Grasp Pipeline
+# UR5 Grasp Pipeline в PyBullet
 
-## Overview
+Проект содержит исследовательский пайплайн захвата для манипулятора **UR5** с захватом **Robotiq 2F-85** в среде **PyBullet**. Репозиторий предназначен для воспроизводимых экспериментов по генерации захватов, проверке force-closure, выполнению pick-and-place и сравнению стратегий выбора захвата.
 
-This repository presents a research-oriented grasping pipeline for the **UR5 robotic manipulator with a Robotiq 85 gripper** in the PyBullet simulation environment.
-The project focuses on generating and evaluating grasp candidates, executing pick-and-place motions, and enabling reproducible experiments for grasp planning research.
+Поддерживаются три режима выбора захвата:
+- `nofc` — базовый антиподальный генератор без force-closure фильтрации
+- `eps` — выбор захвата по `ε`-метрике Ferrari-Canny
+- `hybrid` — гибридный режим, сочетающий `nofc` и `ε`-оценку
 
-The pipeline supports antipodal grasp generation, force-closure evaluation, motion planning, and synthetic dataset creation for grasp analysis.
+## Демонстрация
 
----
+![Пример эксперимента](media/exam.png)
 
-## Features
+<video src="media/grasp.mp4" controls width="900"></video>
 
-* UR5 + Robotiq 85 simulation in PyBullet
-* Antipodal grasp candidate generation
-* Force-closure evaluation module
-* Pick-and-place execution pipeline
-* Synthetic point cloud dataset generation
-* Grasp logging and analysis tools
-* Modular utilities for planning, perception, and control
+## Что есть в репозитории
 
----
+- [pick_pipeline.py](/home/dood/ur5_grasp_object_pybullet/pick_pipeline.py) — основной сценарий эксперимента
+- [force_closure_module.py](/home/dood/ur5_grasp_object_pybullet/force_closure_module.py) — вычисление force-closure и `ε`-метрики
+- [close_nofc.py](/home/dood/ur5_grasp_object_pybullet/close_nofc.py) — генератор базовых grasp-кандидатов
+- `utils/` — утилиты для камеры, облаков точек, движения, логирования и робота
+- `tools/` — скрипты анализа логов, построения таблиц и графиков
+- [make_poses.py](/home/dood/ur5_grasp_object_pybullet/make_poses.py) — генерация фиксированного набора поз
+- [poses.json](/home/dood/ur5_grasp_object_pybullet/poses.json) — набор поз объекта для воспроизводимых экспериментов
+- `meshes/part/` — тестовые CAD-объекты
+- `urdf/` — модель UR5 + Robotiq
 
-## Repository Structure
+## Структура эксперимента
 
-```
-.
-├── pick_pipeline.py        # Main grasp execution pipeline
-├── capture_cloud_dataset.py# Synthetic dataset generation
-├── force_closure_module.py # Force-closure evaluation
-├── utils/                  # Core utilities
-│   ├── camera_utils.py
-│   ├── cloud_utils.py
-│   ├── grasp_gen_utils.py
-│   ├── motion_utils.py
-│   ├── planning_utils.py
-│   └── robot_ur5_robotiq85.py
-├── meshes/                 # Robot and object meshes
-├── urdf/                   # URDF models
-├── tools/                  # Analysis scripts
-├── graspit_env.yml         # Conda environment
-└── README.md
-```
+Одна попытка включает:
+- установку объекта в заранее заданную позу
+- захват depth/point cloud
+- генерацию кандидатов захвата
+- фильтрацию и ранжирование кандидатов
+- выполнение захвата, подъёма и укладки в корзину
+- запись полной строки в `grasp_attempts.jsonl`
 
----
+В логах сохраняются:
+- успех/неуспех пайплайна
+- причина отказа
+- временные метрики
+- параметры выбранного захвата
+- значения force-closure
+- peak RAM и число вычислений `ε`-метрики
 
-## Installation
+## Установка
 
-### 1. Clone repository
-
-```bash
-git clone https://github.com/dakolzin/pybullet-ur5-grasping.git
-cd pybullet-ur5-grasping
-```
-
-### 2. Create environment
+### 1. Создание окружения
 
 ```bash
 conda env create -f graspit_env.yml
 conda activate graspit
 ```
 
----
+### 2. Подключение `pybullet-planning`
 
-## Quick Start
-
-### Run grasp pipeline
+Если пакет не установлен как модуль, добавь репозиторий в `PYTHONPATH`:
 
 ```bash
-python pick_pipeline.py
+export PYTHONPATH=$PYTHONPATH:/home/dood/ur5_grasp_object_pybullet/pybullet-planning
 ```
 
-### Generate synthetic dataset
+При необходимости можно установить локально:
 
 ```bash
-python capture_cloud_dataset.py
+pip install -e ./pybullet-planning
 ```
 
-### Visualize point clouds
+## Быстрый запуск
+
+Запуск одного эксперимента:
 
 ```bash
-python view_cloud.py
+python3 pick_pipeline.py --mode hybrid --mesh part_1
 ```
 
----
-
-## Pipeline Description
-
-The grasp pipeline consists of the following stages:
-
-1. **Scene generation**
-
-   * Object spawning in simulation
-   * Camera capture of depth and point clouds
-
-2. **Point cloud processing**
-
-   * Filtering and downsampling
-   * Surface normal estimation
-
-3. **Grasp generation**
-
-   * Antipodal grasp sampling
-   * Candidate filtering
-
-4. **Grasp evaluation**
-
-   * Force-closure verification
-   * Collision checking
-
-5. **Motion planning**
-
-   * Inverse kinematics
-   * Joint trajectory planning
-
-6. **Execution**
-
-   * Gripper closure
-   * Object lifting and placement
-
----
-
-## Reproducibility
-
-All experiments can be reproduced using the provided environment file:
+Запуск без визуализации:
 
 ```bash
-conda env create -f graspit_env.yml
-conda activate graspit
+python3 pick_pipeline.py --no_gui --mode nofc --mesh part_1 --max_attempts 100 --top_k 200
 ```
 
-No external datasets are required — synthetic scenes can be generated using:
+Продолжение прерванного эксперимента:
 
 ```bash
-python capture_cloud_dataset.py
+python3 pick_pipeline.py --no_gui --mode hybrid --mesh part_1 --max_attempts 1000 --top_k 200 --out_root logs_v5 --resume
 ```
 
----
+## Доступные объекты
 
-## Demo
+В репозитории используются меши:
+- `part_1`
+- `part_2`
+- `part_4`
+- `part_5`
 
-Example grasp execution in PyBullet simulation.
+Они выбираются через аргумент `--mesh`.
 
-*(Add GIF or video link here)*
+## Доступные режимы
 
----
+- `nofc`
+- `eps`
+- `hybrid`
 
-## Applications
+Пример:
 
-* Research in robotic grasp planning
-* Evaluation of force-closure metrics
-* Synthetic dataset generation for grasp learning
-* Benchmarking grasp strategies
+```bash
+python3 pick_pipeline.py --no_gui --mode eps --mesh part_4 --max_attempts 100 --top_k 200 --out_root logs_v5
+```
 
----
+## Воспроизводимые эксперименты
 
-## Future Work
+Для корректного сравнения методов используется фиксированный список поз объекта из [poses.json](/home/dood/ur5_grasp_object_pybullet/poses.json). Это позволяет запускать разные методы на одном и том же наборе положений.
 
-* Integration with learning-based grasp planners
-* Partial point cloud grasping experiments
-* Real robot deployment
-* Benchmark dataset publication
+Если нужен новый набор:
 
----
+```bash
+python3 make_poses.py
+```
 
-## License
+## Анализ результатов
 
-This project is intended for research and educational use.
+### 1. Сводка по качеству
+
+```bash
+python3 tools/compare_logs.py --logs_dir logs_v5 --parts part_1,part_2,part_4,part_5 --modes nofc eps hybrid
+```
+
+### 2. Парное сравнение по одинаковым `pose_idx`
+
+```bash
+for p in part_1 part_2 part_4 part_5; do
+  python3 compare_methods.py --logs_root logs_v5 --object $p
+done
+```
+
+### 3. Сравнение только на тех позах, где все методы нашли захват
+
+```bash
+for p in part_1 part_2 part_4 part_5; do
+  python3 tools/compare_found_only.py --logs_root logs_v5 --object $p --modes nofc eps hybrid
+done
+```
+
+### 4. Временные метрики
+
+```bash
+python3 tools/plot_time_comparison.py \
+  --parts part_1,part_2,part_4,part_5 \
+  --root_nofc logs_v5 \
+  --root_eps logs_v5 \
+  --root_hybrid logs_v5 \
+  --metrics synthesis \
+  --out_dir paper_time_v5
+```
+
+### 5. Ресурсоёмкость
+
+```bash
+python3 tools/plot_resource_comparison.py \
+  --logs_root logs_v5 \
+  --parts part_1,part_2,part_4,part_5 \
+  --out_dir paper_resource_v5
+```
+
+## Формат логов
+
+Каждая попытка записывается в:
+
+```text
+logs/<object>/<mode>/grasp_attempts.jsonl
+```
+
+или в другой каталог, если указан `--out_root`.
+
+Внутри строки JSON фиксируются:
+- `pose_idx`
+- `pipeline_ok`
+- `task_success`
+- `fail_reason`
+- `fc_ok`, `fc_eps`
+- `extra.perf.t_grasp_synthesis_s`
+- `extra.perf.peak_ram_mb`
+- `extra.perf.n_eps_metric_calls`
+
+## Основные сценарии использования
+
+### Сбор данных для статьи
+
+```bash
+python3 pick_pipeline.py --no_gui --mode nofc   --mesh part_1 --max_attempts 100 --top_k 200 --out_root logs_v5
+python3 pick_pipeline.py --no_gui --mode eps    --mesh part_1 --max_attempts 100 --top_k 200 --out_root logs_v5
+python3 pick_pipeline.py --no_gui --mode hybrid --mesh part_1 --max_attempts 100 --top_k 200 --out_root logs_v5
+```
+
+### Мониторинг долгого запуска
+
+```bash
+python3 live_monitor.py --log logs_v5/part_1/hybrid/grasp_attempts.jsonl
+```
+
+## Зависимости
+
+Основные зависимости уже описаны в [graspit_env.yml](/home/dood/ur5_grasp_object_pybullet/graspit_env.yml). Среди ключевых:
+- `pybullet`
+- `numpy`
+- `scipy`
+- `scikit-learn`
+- `matplotlib`
+- `trimesh`
+- `psutil`
+
+## Назначение проекта
+
+Репозиторий ориентирован на:
+- исследование стратегий выбора захвата
+- сравнение `nofc`, `eps` и `hybrid`
+- анализ устойчивости захвата после закрытия и подъёма
+- воспроизводимые численные эксперименты в PyBullet
+
+## Примечание
+
+Проект рассчитан в первую очередь на исследовательское использование. Если среда развёртывается на новой машине, сначала проверь:
+- доступность `pybullet-planning`
+- корректный `PYTHONPATH`
+- наличие окружения `graspit`
+
